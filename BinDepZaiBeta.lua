@@ -1,193 +1,217 @@
-function fly()
-    -- Hàm tải bản đồ (chunks) bất đồng bộ khi bay
-    local function loadMapChunksWhileFlying(player, chunkSize, maxDistance, loadDistance)
-        -- Kiểm tra nếu nhân vật hợp lệ
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+function FlyHeight()
+        -- Gọi hàm FlyHeight
+   
+
+    local FlyHeight_Number = 20 -- Độ cao bay
+
+    -- Biến trạng thái để theo dõi khi nhân vật bắt đầu bay
+    local hasStartedFlying = false
+
+    -- Hàm để giữ `HumanoidRootPart` của nhân vật lơ lửng
+    function KeepFloating(humanoidRootPart, flyHeight)
+        -- Kiểm tra `HumanoidRootPart` hợp lệ
+        if not humanoidRootPart then
+            warn("HumanoidRootPart không hợp lệ!")
+            return
+        end
+
+        -- Tạo hoặc sử dụng `BodyPosition` để giữ vị trí ổn định
+        local bodyPosition = humanoidRootPart:FindFirstChild("BodyPosition")
+        if not bodyPosition then
+            -- Tạo BodyPosition chỉ khi chưa có
+            bodyPosition = Instance.new("BodyPosition", humanoidRootPart)
+            bodyPosition.MaxForce = Vector3.new(100000, 100000, 100000) -- Lực tác động mạnh
+            bodyPosition.D = 5 -- Độ giảm dao động (dựng dực) thấp hơn
+            bodyPosition.P = 10000 -- Lực giữ lại mạnh
+            bodyPosition.Name = "BodyPosition" -- Đặt tên để dễ kiểm tra
+        end
+
+        -- Nếu chưa bắt đầu bay, đặt vị trí ngay lập tức mà không dao động
+        if not hasStartedFlying then
+            -- Đảm bảo không có dao động, đặt vị trí ngay lập tức
+            humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position.X, flyHeight, humanoidRootPart.Position.Z)
+            -- Sử dụng BodyPosition sau khi đặt vị trí để giữ nó
+            bodyPosition.Position = Vector3.new(humanoidRootPart.Position.X, flyHeight, humanoidRootPart.Position.Z)
+            hasStartedFlying = true
+        else
+            -- Cập nhật vị trí của HumanoidRootPart để giữ nó ở độ cao bay
+            bodyPosition.Position = Vector3.new(humanoidRootPart.Position.X, flyHeight, humanoidRootPart.Position.Z)
+        end
+    end
+
+    -- Giữ nhân vật của người chơi luôn bay
+    task.spawn(function()
+        while true do
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                -- Giữ nhân vật bay ở độ cao cố định
+                KeepFloating(character.HumanoidRootPart, FlyHeight_Number)
+            end
+            task.wait(0.1) -- Lặp lại mỗi 0.1 giây để cập nhật vị trí
+        end
+    end)
+
+    -- Đảm bảo nhân vật không rơi khi bị quái đánh trúng
+    character.HumanoidRootPart.Touched:Connect(function(hit)
+        -- Kiểm tra đối tượng va chạm
+        if hit and hit.Parent and hit.Parent:FindFirstChild("Humanoid") then
+            -- Nếu đối tượng là quái vật, giữ lại vị trí lơ lửng
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                -- Khi quái đánh vào, không làm thay đổi vị trí của người chơi
+                KeepFloating(character.HumanoidRootPart, FlyHeight_Number)
+            end
+        end
+    end)
+
+end
+
+function Kill()
+    local attackRadius = 100 -- Bán kính tầm đánh hình tròn 50x50
+    local targetTag = "Enemy" -- Nhãn hoặc đối tượng quái vật, có thể điều chỉnh theo cấu trúc game
+
+    -- Hàm tự động tấn công các quái vật trong phạm vi tấn công
+    function AutoAttackInRange()
+        -- Xác định vị trí của nhân vật
+        local characterPosition = character.HumanoidRootPart.Position
+
+        -- Duyệt qua tất cả các đối tượng trong workspace
+        for _, obj in pairs(workspace:GetDescendants()) do
+            -- Kiểm tra xem đối tượng có phải là một quái vật (có Humanoid)
+            if obj:IsA("BasePart") and obj.Parent and obj.Parent:FindFirstChild("Humanoid") then
+                -- Kiểm tra nếu quái vật nằm trong phạm vi tấn công (bán kính 50x50)
+                local distance = (obj.Position - characterPosition).Magnitude
+                if distance <= attackRadius then
+                    -- Nếu trong phạm vi, thực hiện tấn công quái vật
+                    local args = {
+                        [1] = obj.Parent:FindFirstChild("LeftHand") or obj.Parent:FindFirstChild("Head"), -- Tấn công vào bộ phận quái vật (có thể thay đổi nếu cần)
+                        [2] = {}
+                    }
+
+                    -- Gửi yêu cầu tấn công quái vật
+                    game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterHit"):FireServer(unpack(args))
+
+                    -- Sau khi tấn công, gửi yêu cầu sử dụng tấn công thường (có thể tùy chỉnh)
+                    local attackArgs = {
+                        [1] = 0.5 -- Tham số mà bạn yêu cầu khi tấn công
+                    }
+
+                    game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterAttack"):FireServer(unpack(attackArgs))
+                end
+            end
+        end
+    end
+
+    -- Hàm tự động tấn công liên tục
+    task.spawn(function()
+        while true do
+            -- Gọi hàm tự động tấn công trong phạm vi
+            AutoAttackInRange()
+
+            -- Chờ một chút trước khi kiểm tra lại
+            task.wait(0.6) -- Bạn có thể điều chỉnh khoảng thời gian giữa các lần kiểm tra
+        end
+    end)
+
+
+    function All_Text()
+        local player = game.Players.LocalPlayer
         local character = player.Character or player.CharacterAdded:Wait()
-        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+        local FlyHeight_Number = 20 -- Độ cao bay
+        local hasStartedFlying = false  -- Biến trạng thái để theo dõi khi nhân vật bắt đầu bay
+
+        local attackRadius = 100 -- Bán kính tầm đánh hình tròn 50x50
+        local targetTag = "Enemy" -- Nhãn hoặc đối tượng quái vật, có thể điều chỉnh theo cấu trúc game 
+    end
+
+end
+
+function Teleport()
         
-        -- Hàm tạo một mảnh bản đồ (chunk) giả lập (có thể thay thế bằng mô hình hoặc đối tượng game thực tế)
-        local function loadChunk(position)
-            local chunk = Instance.new("Part")
-            chunk.Size = Vector3.new(chunkSize, 1, chunkSize)
-            chunk.Position = position
-            chunk.Anchored = true
-            chunk.Parent = workspace
-            chunk.Name = "MapChunk"
+    -- Hàm để teleport quái vật trong thư mục Enemies đến gần nhân vật người chơi
+    function TeleportEnemyToPlayer(enemy)
+        -- Kiểm tra xem đối tượng có phải là quái vật không và có HumanoidRootPart
+        if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+            -- Lấy vị trí của nhân vật người chơi và quái vật
+            local playerPosition = character.HumanoidRootPart.Position
+            local enemyPosition = enemy.HumanoidRootPart.Position
+
+            -- Tính toán vị trí mà quái vật cần đến (đặt lại gần nhân vật)
+            local newPosition = playerPosition + (enemyPosition - playerPosition).Unit * 5  -- Quái vật sẽ xuất hiện cách người chơi 5 studs
+
+            -- Kiểm tra và điều chỉnh vị trí Y của quái vật để nó luôn đứng trên mặt đất
+            local terrain = workspace:FindFirstChild("Terrain")
+            local groundY = terrain and terrain:WorldToCellPreferSolid(newPosition).Y or 0  -- Xác định độ cao của mặt đất tại vị trí mới
             
-            -- Giả lập tải dữ liệu mảnh với độ trễ nhỏ để không làm gián đoạn game
-            wait(0.05)
-        end
-    
-        -- Hàm để tải các mảnh bản đồ gần người chơi
-        local function loadNearbyChunks()
-            local playerPosition = humanoidRootPart.Position
-            local minX = playerPosition.X - maxDistance
-            local maxX = playerPosition.X + maxDistance
-            local minZ = playerPosition.Z - maxDistance
-            local maxZ = playerPosition.Z + maxDistance
-    
-            -- Lặp qua các mảnh bản đồ xung quanh người chơi để tải
-            for x = minX, maxX, chunkSize do
-                for z = minZ, maxZ, chunkSize do
-                    loadChunk(Vector3.new(x, playerPosition.Y, z))
-                end
+            -- Đặt vị trí quái vật mới, đảm bảo nó ở trên mặt đất
+            newPosition = Vector3.new(newPosition.X, groundY + 2, newPosition.Z)  -- Đảm bảo quái vật đứng trên mặt đất
+
+            -- Teleport quái vật đến vị trí mới
+            enemy.HumanoidRootPart.CFrame = CFrame.new(newPosition)
+
+            -- Khôi phục hành động của quái vật
+            local humanoid = enemy:FindFirstChild("Humanoid")
+            if humanoid then
+                -- Đảm bảo quái vật có thể tiếp tục di chuyển bình thường
+                humanoid:MoveTo(newPosition)  -- Đảm bảo rằng quái vật di chuyển đến vị trí mới
+                
+                -- Tăng tốc độ nếu cần (giữ tốc độ di chuyển mặc định)
+                humanoid.WalkSpeed = 16 
+
+                -- Giữ nguyên trạng thái di chuyển hoặc hành động
+                humanoid:MoveTo(enemy.HumanoidRootPart.Position)  -- Đảm bảo quái vật không bị "đơ" và tiếp tục hành động
             end
         end
-    
-        -- Tạo sự kiện lắng nghe thay đổi vị trí của người chơi khi bay
-        game:GetService("RunService").Heartbeat:Connect(function()
-            -- Khi người chơi đang bay, tải các mảnh xung quanh
-            loadNearbyChunks()
-        end)
     end
-    
-    -- Gọi hàm tải bản đồ cho người chơi
-    local player = game.Players.LocalPlayer
-    local chunkSize = 100000000000000000  -- Kích thước mỗi mảnh (chunk)
-    local maxDistance = 3000000000000000  -- Khoảng cách tối đa tải mảnh quanh người chơi (300 studs)
-    
-    -- Gọi hàm tải bản đồ khi người chơi đang bay
-    loadMapChunksWhileFlying(player, chunkSize, maxDistance)
-    
-    
-        -- Hàm để nhân vật bay, di chuyển, đứng yên và xuyên qua các vật thể, nhưng không rơi xuống đất
-    local function flyAndPassThrough(character, flyHeight, moveSpeed)
-        -- Kiểm tra nhân vật và các thành phần cần thiết
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            warn("Nhân vật không hợp lệ!")
-            return
-        end
-    
-        -- Lấy HumanoidRootPart
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-    
-        -- Tạo BodyVelocity để kiểm soát lực di chuyển
-        local bodyVelocity = Instance.new("BodyVelocity", rootPart)
-        bodyVelocity.MaxForce = Vector3.new(1e5, 0, 1e5) -- Di chuyển trên trục XZ, không tác động trục Y
-        bodyVelocity.Velocity = Vector3.zero -- Ban đầu không di chuyển
-    
-        -- Tạo BodyPosition để giữ nhân vật ở độ cao cố định
-        local bodyPosition = Instance.new("BodyPosition", rootPart)
-        bodyPosition.MaxForce = Vector3.new(0, 1e5, 0) -- Chỉ tác động trục Y
-        bodyPosition.Position = Vector3.new(rootPart.Position.X, flyHeight, rootPart.Position.Z)
-        bodyPosition.D = 10 -- Giảm dao động khi giữ vị trí
-    
-        -- Bật chế độ xuyên tường cho nhân vật
-        -- for _, part in pairs(character:GetDescendants()) do
-        --     if part:IsA("BasePart") then
-        --         part.CanCollide = false
-        --     end
-        -- end
-    
-        -- Bật chế độ xuyên qua tất cả các vật thể trong game, trừ mặt đất
-        -- for _, obj in pairs(workspace:GetDescendants()) do
-        --     if obj:IsA("BasePart") and obj.Name ~= "Terrain" then
-        --         obj.CanCollide = false
-        --     end
-        -- end
-    
-        -- Theo dõi hướng di chuyển từ bàn phím (WASD)
-        game:GetService("RunService").RenderStepped:Connect(function()
-            local moveDirection = game.Players.LocalPlayer.Character.Humanoid.MoveDirection
-    
-            if moveDirection.Magnitude > 0 then
-                -- Di chuyển nếu có input từ người chơi
-                bodyVelocity.Velocity = Vector3.new(
-                    moveDirection.X * moveSpeed,
-                    0, -- Không tác động trục Y
-                    moveDirection.Z * moveSpeed
-                )
-            else
-                -- Đứng yên nếu không có input từ người chơi
-                bodyVelocity.Velocity = Vector3.zero
-            end
-        end)
-    end
-    
-    -- Gọi hàm flyAndPassThrough
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    
-    -- Nhân vật bay lên cao 50 đơn vị, di chuyển với tốc độ 20, và xuyên qua tất cả
-    flyAndPassThrough(character, 200, 1000)
-    end
-    fly()
-    
-    
-    function Killl()
-        -- Hàm xử lý tấn công nhanh với khả năng điều chỉnh tốc độ tấn công
-    local function fastAutoAttack(character, range, damage, attackSpeed)
-        -- Kiểm tra nếu nhân vật và quái vật hợp lệ
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            warn("Nhân vật không hợp lệ!")
-            return
-        end
-    
-        local lastAttackTime = 0  -- Thời gian của lần tấn công cuối cùng
-        local cooldown = 1 / attackSpeed  -- Tính cooldown dựa trên tốc độ tấn công (s)
-    
-        -- Tạo vùng ảnh hưởng (AoE) quanh nhân vật
-        local function createAttackArea()
-            local attackArea = Instance.new("Part")
-            attackArea.Shape = Enum.PartType.Ball
-            attackArea.Size = Vector3.new(range, range, range)  -- Kích thước của vùng tấn công
-            attackArea.Transparency = 0.5
-            attackArea.CanCollide = false
-            attackArea.Position = character.HumanoidRootPart.Position
-            attackArea.Parent = workspace
-    
-            local light = Instance.new("PointLight")
-            light.Parent = attackArea
-            light.Range = range
-            light.Brightness = 5
-    
-            wait(1)  -- Hiệu ứng tồn tại trong 1 giây
-            attackArea:Destroy()  -- Xóa vùng ảnh hưởng sau 1 giây
-        end
-    
-        -- Lắng nghe sự kiện va chạm
-        character.HumanoidRootPart.Touched:Connect(function(hit)
-            -- Kiểm tra nếu đối tượng va chạm là quái vật
-            if hit and hit.Parent and hit.Parent:FindFirstChild("Humanoid") then
-                local enemy = hit.Parent
-                local currentTime = tick()  -- Thời gian hiện tại
-    
-                -- Kiểm tra cooldown giữa các lần tấn công
-                if currentTime - lastAttackTime >= cooldown then
-                    lastAttackTime = currentTime  -- Cập nhật thời gian tấn công mới
-    
-                    -- Tạo vùng ảnh hưởng (AoE)
-                    createAttackArea()
-    
-                    -- Gửi thông tin tấn công mạnh (RegisterHit)
-                    local argsHit = {
-                        [1] = enemy:FindFirstChild("RightHand"),  -- Phần cơ thể của quái vật (RightHand)
-                        [2] = {}  -- Các thông tin tấn công khác
-                    }
-                    game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterHit"):FireServer(unpack(argsHit))
+
+    -- Hàm kiểm tra và tự động teleport các quái vật trong thư mục Enemies
+    function AutoTeleportEnemies()
+        -- Lấy tất cả các quái vật từ thư mục Enemies
+        local enemiesFolder = workspace:FindFirstChild("Enemies")
+        local teleportCount = 0 -- Biến đếm số lượng quái vật đã teleport
+        
+        -- Kiểm tra nếu thư mục Enemies tồn tại
+        if enemiesFolder then
+            -- Duyệt qua tất cả quái vật trong thư mục Enemies
+            for _, enemy in pairs(enemiesFolder:GetChildren()) do
+                -- Kiểm tra xem đối tượng có phải là quái vật (có HumanoidRootPart và Humanoid)
+                if enemy:IsA("Model") and enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChild("Humanoid") then
+                    -- Nếu đã teleport 5 quái vật, dừng lại
+                    if teleportCount >= 5 then
+                        break
+                    end
                     
-                    -- Gửi thông tin tấn công mạnh (RegisterAttack) với lượng damage
-                    local argsAttack = {
-                        [1] = damage  -- Sát thương mỗi lần tấn công
-                    }
-                    game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterAttack"):FireServer(unpack(argsAttack))
-    
-                    -- In thông báo tấn công
-                    print("Tấn công nhanh vào quái vật: " .. enemy.Name .. " với sát thương " .. damage)
+                    -- Gọi hàm teleport quái vật về phía nhân vật
+                    TeleportEnemyToPlayer(enemy)
+
+                    -- Tăng biến đếm
+                    teleportCount = teleportCount + 1
                 end
             end
-        end)
+        end
     end
-    
-    -- Gọi hàm tự động tấn công nhanh với phạm vi tấn công lớn và sát thương mạnh
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    
-    local attackRange = 1000  -- Phạm vi tấn công (radius của vùng ảnh hưởng)
-    local attackDamage = 100000000000000000000000000  -- Sát thương mỗi lần tấn công
-    local attackSpeed = 100000   -- Tốc độ tấn công (tấn công mỗi 0.5 giây)
-    
-    fastAutoAttack(character, attackRange, attackDamage, attackSpeed)
-    
-    end
-    Killl()
+
+    -- Hàm tự động kiểm tra và teleport liên tục
+    task.spawn(function()
+        while true do
+            -- Gọi hàm tự động teleport quái vật trong thư mục Enemies
+            AutoTeleportEnemies()
+
+            -- Chờ một chút trước khi kiểm tra lại
+            task.wait(6) -- Điều chỉnh thời gian giữa các lần kiểm tra (5 giây)
+        end
+    end)
+end
+
+function CheckLevelPlyer()
+  local level = tonumber(player.PlayerStats.value)
+  print(level)
+end
+CheckLevelPlyer()
+print(CheckLevelPlyer())
+
+-- function Check()
+--     if player.level > le
+-- end
