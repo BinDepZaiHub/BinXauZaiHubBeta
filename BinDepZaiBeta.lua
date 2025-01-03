@@ -1,9 +1,7 @@
-local player = game.Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-
 function FlyHeight()
         -- Gọi hàm FlyHeight
-   
+     local player = game.Players.LocalPlayer
+     local character = player.Character or player.CharacterAdded:Wait()
 
     local FlyHeight_Number = 20 -- Độ cao bay
 
