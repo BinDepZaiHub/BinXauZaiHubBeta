@@ -68,11 +68,17 @@ function FlyHeight()
 end
 
 function Kill()
-    local attackRadius = 100 -- Bán kính tầm đánh hình tròn 50x50
-    local targetTag = "Enemy" -- Nhãn hoặc đối tượng quái vật, có thể điều chỉnh theo cấu trúc game
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local attackRadius = 1000 -- Bán kính tầm đánh hình tròn
+    local dame = math.huge -- Số lượng damage gây ra
+    local targetTag = "Enemy" -- Nhãn hoặc đối tượng quái vật
 
     -- Hàm tự động tấn công các quái vật trong phạm vi tấn công
     function AutoAttackInRange()
+        -- Kiểm tra nếu nhân vật và HumanoidRootPart tồn tại
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        
         -- Xác định vị trí của nhân vật
         local characterPosition = character.HumanoidRootPart.Position
 
@@ -80,53 +86,36 @@ function Kill()
         for _, obj in pairs(workspace:GetDescendants()) do
             -- Kiểm tra xem đối tượng có phải là một quái vật (có Humanoid)
             if obj:IsA("BasePart") and obj.Parent and obj.Parent:FindFirstChild("Humanoid") then
-                -- Kiểm tra nếu quái vật nằm trong phạm vi tấn công (bán kính 50x50)
+                -- Kiểm tra nếu quái vật nằm trong phạm vi tấn công
                 local distance = (obj.Position - characterPosition).Magnitude
                 if distance <= attackRadius then
                     -- Nếu trong phạm vi, thực hiện tấn công quái vật
-                    local args = {
-                        [1] = obj.Parent:FindFirstChild("LeftHand") or obj.Parent:FindFirstChild("Head"), -- Tấn công vào bộ phận quái vật (có thể thay đổi nếu cần)
-                        [2] = {}
-                    }
-
-                    -- Gửi yêu cầu tấn công quái vật
-                    game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterHit"):FireServer(unpack(args))
-
-                    -- Sau khi tấn công, gửi yêu cầu sử dụng tấn công thường (có thể tùy chỉnh)
-                    local attackArgs = {
-                        [1] = 0.5 -- Tham số mà bạn yêu cầu khi tấn công
-                    }
-
-                    game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterAttack"):FireServer(unpack(attackArgs))
+                    local targetPart = obj.Parent:FindFirstChild("LeftHand") or obj.Parent:FindFirstChild("Head")
+                    if targetPart then
+                            -- Gửi yêu cầu tấn công quái vật
+                            local args = {
+                                [1] = targetPart, -- Tấn công vào bộ phận quái vật
+                                [2] = {}}
+                            game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterHit"):FireServer(unpack(args))
+                            -- Gửi yêu cầu sử dụng tấn công thường
+                            local attackArgs = {
+                                [1] = dame }
+                            game:GetService("ReplicatedStorage").Modules.Net:FindFirstChild("RE/RegisterAttack"):FireServer(unpack(attackArgs))
+                    end
                 end
             end
         end
     end
-
     -- Hàm tự động tấn công liên tục
     task.spawn(function()
         while true do
-            -- Gọi hàm tự động tấn công trong phạm vi
             AutoAttackInRange()
-
             -- Chờ một chút trước khi kiểm tra lại
-            task.wait(0.6) -- Bạn có thể điều chỉnh khoảng thời gian giữa các lần kiểm tra
+            task.wait(0.1) -- Bạn có thể điều chỉnh khoảng thời gian giữa các lần kiểm tra
         end
     end)
-
-
-    function All_Text()
-        local player = game.Players.LocalPlayer
-        local character = player.Character or player.CharacterAdded:Wait()
-
-        local FlyHeight_Number = 20 -- Độ cao bay
-        local hasStartedFlying = false  -- Biến trạng thái để theo dõi khi nhân vật bắt đầu bay
-
-        local attackRadius = 100 -- Bán kính tầm đánh hình tròn 50x50
-        local targetTag = "Enemy" -- Nhãn hoặc đối tượng quái vật, có thể điều chỉnh theo cấu trúc game 
-    end
-
 end
+Kill()
 
 function Teleport()
         
